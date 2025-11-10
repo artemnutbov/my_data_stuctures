@@ -24,6 +24,8 @@ public:
 
     my_deque() = default;
     void push_back(const T& val);
+    void push_front(const T& val);
+
 
     ~my_deque();
 };
@@ -66,8 +68,57 @@ void my_deque<T>::push_back(const T& val) {
             arr_ = newarr; 
         }
     }
-    new(arr_[back_.i]) T(val);
-    
+    new(arr_[back_.i] + back_.j) T(val);
+}
+
+
+
+template <typename T>
+void my_deque<T>::push_front(const T& val) {
+    ++size_;
+    if(!arr_) {
+        arr_ = new T*[DEFAULT_SIZE];
+        arr_size_ = DEFAULT_SIZE;
+        front_.i = back_.i = 1;
+        front_.j = back_.j = 0;
+        for(size_t i = 0; i < arr_size_;++i){
+            arr_[i] = reinterpret_cast<T*>(new char[SIZE_OF_BUCKET*sizeof(T)]);
+        }
+            
+        new(arr_[back_.i]) T(val); // check if this throw and how it. next time !!!
+        return;
+    }
+
+    if(front_.j == 0 ) {
+        front_.j = SIZE_OF_BUCKET - 1;
+
+        if(front_.i == 0){
+            // reallocate
+            T** newarr = new T*[arr_size_* SIZE_SCALE];
+            size_t half_size = arr_size_/2;
+            front_.i += half_size;
+            back_.i += half_size;
+            size_t index = 0;
+            for(;index < half_size;++index) {
+                newarr[index] = reinterpret_cast<T*>(new char[SIZE_OF_BUCKET*sizeof(T)]);
+            }
+            for(int i = 0;index < arr_size_ + half_size;++index, ++i) {
+                newarr[index] = arr_[i]; 
+            }
+            arr_size_ *= SIZE_SCALE;
+            for(;index < arr_size_ ;++index) {
+                newarr[index] = reinterpret_cast<T*>(new char[SIZE_OF_BUCKET*sizeof(T)]);
+            }
+            delete[] reinterpret_cast<char*>(arr_);
+            arr_ = newarr; 
+        }
+        --front_.i;
+        new(arr_[front_.i] + front_.j) T(val);
+    }
+    else {
+        --front_.j;
+        new(arr_[front_.i] + front_.j) T(val);
+    }
 }
 
 template <typename T>
@@ -86,10 +137,10 @@ my_deque<T>::~my_deque() {
         delete[] arr_;
     }
 }
+
 int main() {
     my_deque<int> d;
     for(int i = 0; i < 1000;++i) {
-        d.push_back(15);
+        d.push_front(i);
     }
-    
 }
