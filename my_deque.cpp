@@ -1,4 +1,5 @@
 #include <iostream>
+#include <vector>
 #define SIZE_OF_BUCKET  32
 #define DEFAULT_SIZE  2
 #define SIZE_SCALE  2
@@ -21,15 +22,48 @@ class my_deque {
     size_t arr_size_ = 0;
 public:
     using value_type = T;
-
+    
     my_deque() = default;
+    my_deque(const my_deque& other);
     void push_back(const T& val);
     void push_front(const T& val);
+    void pop_back();
+    void pop_front();
+
 
     T& operator[](size_t index);
 
     ~my_deque();
 };
+
+template <typename T>
+my_deque<T>::my_deque(const my_deque& other):arr_(new T*[other.arr_size_]),front_(other.front_),back_(other.back_),size_(other.size_),arr_size_(other.arr_size_) {
+    for(size_t i = 0; i < arr_size_;++i){
+        arr_[i] = reinterpret_cast<T*>(new char[SIZE_OF_BUCKET*sizeof(T)]);
+    }
+
+    if(front_.i == back_.i) {
+        for(size_t i = front_.j;i <= back_.j; ++i)
+            new(arr_[front_.i] + i) T(other.arr_[front_.i][i]);
+    }
+    else {
+        for(size_t i = front_.j;i < SIZE_OF_BUCKET; ++i)
+            new(arr_[front_.i] + i) T(other.arr_[front_.i][i]);
+                
+            
+        //front_.j = 0;
+        for(size_t i = front_.i + 1;i < back_.i ;++i) {
+            for(size_t j = 0;j < SIZE_OF_BUCKET;++j) {
+                new(arr_[i] + j) T(other.arr_[i][j]);
+            }
+        }
+
+        for(size_t i = 0;i <= back_.j; ++i)
+            new(arr_[back_.i] + i) T(other.arr_[back_.i][i]);
+
+    }
+    // maybe need to write exception safety
+}
 
 template <typename T>
 void my_deque<T>::push_back(const T& val) {
@@ -123,6 +157,31 @@ void my_deque<T>::push_front(const T& val) {
 }
 
 template <typename T>
+void my_deque<T>::pop_back() {
+    --size_;
+    if(!arr_) return;
+    (arr_[back_.i] + back_.j)->~T();
+    if(back_.j == 0) {
+        back_.j = SIZE_OF_BUCKET - 1;
+        --back_.i;
+    }
+    else
+        --back_.j;
+}
+
+
+template <typename T>
+void my_deque<T>::pop_front() {
+    --size_;
+    if(!arr_) return;
+    (arr_[front_.i] + front_.j)->~T();
+    if(++front_.j == SIZE_OF_BUCKET) {
+        front_.j = 0;
+        ++front_.i;
+    }
+}
+
+template <typename T>
 T& my_deque<T>::operator[](size_t index) {
     size_t remainder = index % SIZE_OF_BUCKET; 
     
@@ -139,10 +198,22 @@ T& my_deque<T>::operator[](size_t index) {
 template <typename T>
 my_deque<T>::~my_deque() {
     if(arr_) {
-        for(size_t i = front_.i;i < back_.i;++i) {
-            for(size_t j = front_.j;j < back_.j;++j) {
-                (arr_[i] + j)->~T();
+        if(front_.i == back_.i) {
+            for(size_t i = front_.j;i <= back_.j; ++i)
+                (arr_[front_.i] + i)->~T();
+        }
+        else {
+            for(size_t i = front_.j;i < SIZE_OF_BUCKET; ++i)
+                (arr_[front_.i] + i)->~T();
+            
+            for(size_t i = front_.i + 1;i < back_.i ;++i) {
+                for(size_t j = 0;j < SIZE_OF_BUCKET;++j) {
+                    (arr_[i] + j)->~T();
+                }
             }
+
+            for(size_t i = 0;i <= back_.j; ++i)
+                (arr_[back_.i] + i)->~T();
         }
 
         for(size_t i = 0;i < arr_size_;++i){
@@ -154,12 +225,39 @@ my_deque<T>::~my_deque() {
 }
 
 int main() {
-    my_deque<int> d;
-    for(int i = 0; i < 2000;++i) {
-        d.push_front(i);
-    }
-    for(int i = 0; i < 2000;++i) {
-        std::cout << d[i] << ' ';
+    // my_deque<int> d;
+    // for(int i = 0; i < 2000;++i) {
+    //     d.push_front(i);
+    //     d.push_back(i);
+    // }
+    // for(int i = 0; i < 1000;++i) {
+    //     d.pop_back();
+    // }
+    // for(int i = 0; i < 1000;++i) {
+    //     d.pop_front();
+    // }
+
+    
+    // //my_deque<int> dd(d);
+    // for(int i = 0; i < 2000;++i) {
+    //     std::cout << d[i] << ' ';
+    // }
+ 
+    my_deque<std::vector<int>> d;
+    for(int i = 0; i < 400;++i) {
+        std::vector<int> v{i,2,3,4,5};
+
+        d.push_front(v);
+        d.push_back(v);
     }
 
+    my_deque<std::vector<int>> dd = d;
+    
+    for(int i = 0; i < 400;++i) {
+        std::vector<int> v{i,2,3,4,5};
+        dd.push_front(v);
+        dd.push_back(v);
+    }
+    my_deque<std::vector<int>> ddd = dd;
+    
 }
