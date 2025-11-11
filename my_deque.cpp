@@ -26,6 +26,7 @@ public:
     void push_back(const T& val);
     void push_front(const T& val);
 
+    T& operator[](size_t index);
 
     ~my_deque();
 };
@@ -122,6 +123,20 @@ void my_deque<T>::push_front(const T& val) {
 }
 
 template <typename T>
+T& my_deque<T>::operator[](size_t index) {
+    size_t remainder = index % SIZE_OF_BUCKET; 
+    
+    Index tmp(front_.i + index / SIZE_OF_BUCKET, front_.j + remainder);
+    if(front_.j + remainder >= SIZE_OF_BUCKET) {
+        ++tmp.i;
+        tmp.j -= SIZE_OF_BUCKET;
+    }
+    return arr_[tmp.i][tmp.j];
+
+}
+
+
+template <typename T>
 my_deque<T>::~my_deque() {
     if(arr_) {
         for(size_t i = front_.i;i < back_.i;++i) {
@@ -140,7 +155,11 @@ my_deque<T>::~my_deque() {
 
 int main() {
     my_deque<int> d;
-    for(int i = 0; i < 1000;++i) {
+    for(int i = 0; i < 2000;++i) {
         d.push_front(i);
     }
+    for(int i = 0; i < 2000;++i) {
+        std::cout << d[i] << ' ';
+    }
+
 }
