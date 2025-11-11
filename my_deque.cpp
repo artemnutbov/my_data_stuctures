@@ -25,13 +25,15 @@ public:
     
     my_deque() = default;
     my_deque(const my_deque& other);
+    my_deque& operator=(my_deque other);
     void push_back(const T& val);
     void push_front(const T& val);
     void pop_back();
     void pop_front();
-
+    void swap(my_deque& other);
 
     T& operator[](size_t index);
+
 
     ~my_deque();
 };
@@ -51,7 +53,6 @@ my_deque<T>::my_deque(const my_deque& other):arr_(new T*[other.arr_size_]),front
             new(arr_[front_.i] + i) T(other.arr_[front_.i][i]);
                 
             
-        //front_.j = 0;
         for(size_t i = front_.i + 1;i < back_.i ;++i) {
             for(size_t j = 0;j < SIZE_OF_BUCKET;++j) {
                 new(arr_[i] + j) T(other.arr_[i][j]);
@@ -62,8 +63,25 @@ my_deque<T>::my_deque(const my_deque& other):arr_(new T*[other.arr_size_]),front
             new(arr_[back_.i] + i) T(other.arr_[back_.i][i]);
 
     }
-    // maybe need to write exception safety
+    // need to write exception safety
 }
+
+template <typename T>
+my_deque<T>& my_deque<T>::operator=(my_deque other) {
+    swap(other);
+    return *this;
+}
+
+template <typename T>
+void my_deque<T>::swap(my_deque& other) {
+    std::swap(arr_,other.arr_);
+    std::swap(front_,other.front_);
+    std::swap(back_,other.back_);
+    std::swap(size_,other.size_);
+    std::swap(arr_size_,other.arr_size_);
+}
+
+
 
 template <typename T>
 void my_deque<T>::push_back(const T& val) {
@@ -245,19 +263,28 @@ int main() {
  
     my_deque<std::vector<int>> d;
     for(int i = 0; i < 400;++i) {
-        std::vector<int> v{i,2,3,4,5};
+        std::vector<int> v{i,i*i};
 
         d.push_front(v);
         d.push_back(v);
     }
 
-    my_deque<std::vector<int>> dd = d;
-    
-    for(int i = 0; i < 400;++i) {
-        std::vector<int> v{i,2,3,4,5};
-        dd.push_front(v);
-        dd.push_back(v);
+    my_deque<std::vector<int>> dd;
+    dd = d;
+    for(int i = 0; i < 800;++i) {
+        dd[i][0] = 12;
     }
-    my_deque<std::vector<int>> ddd = dd;
+    for(int i = 0; i < 800;++i) {
+        std::cout << dd[i][0] << ' ' << dd[i][1] << ' '; 
+        
+    }
+
+
+    // for(int i = 0; i < 400;++i) {
+    //     std::vector<int> v{i,2,3,4,5};
+    //     dd.push_front(v);
+    //     dd.push_back(v);
+    // }
+    // my_deque<std::vector<int>> ddd = dd;
     
 }
