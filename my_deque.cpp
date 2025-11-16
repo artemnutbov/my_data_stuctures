@@ -38,6 +38,7 @@ public:
     ~my_deque();
 };
 
+
 template <typename T>
 my_deque<T>::my_deque(const my_deque& other):arr_(new T*[other.arr_size_]),front_(other.front_),back_(other.back_),size_(other.size_),arr_size_(other.arr_size_) {
     for(size_t i = 0; i < arr_size_;++i){
@@ -85,41 +86,81 @@ void my_deque<T>::swap(my_deque& other) {
 
 template <typename T>
 void my_deque<T>::push_back(const T& val) {
-    ++size_;
     if(!arr_) {
-        arr_ = new T*[DEFAULT_SIZE];
-        arr_size_ = DEFAULT_SIZE;
+        T** new_arr = nullptr;
+        size_t index = 0;
+        try{
+            new_arr = new T*[DEFAULT_SIZE];
+
+            for(; index < DEFAULT_SIZE;++index){
+                new_arr[index] = reinterpret_cast<T*>(new char[SIZE_OF_BUCKET*sizeof(T)]);
+            }
+            new(new_arr[1]) T(val); 
+
+        } catch(...) {
+            for(size_t i = 0;i < index;++i){
+                delete[] reinterpret_cast<char*>(new_arr[i]);
+            }
+            delete[] new_arr;
+            throw;
+        }
+
+        arr_ = new_arr;
         front_.i = back_.i = 1;
         front_.j = back_.j = 0;
-        for(size_t i = 0; i < arr_size_;++i){
-            arr_[i] = reinterpret_cast<T*>(new char[SIZE_OF_BUCKET*sizeof(T)]);
-        }
-            
-        new(arr_[back_.i]) T(val); // check if this throw and how it. next time !!!
+        arr_size_ = DEFAULT_SIZE;
+        ++size_;     
         return;
     }
+
     if(++back_.j == SIZE_OF_BUCKET ) {
-        back_.j = 0;
+        
         if(++back_.i == arr_size_){
             // reallocate
-            T** newarr = new T*[arr_size_* SIZE_SCALE];
-            size_t half_size = arr_size_/2;
-            front_.i += half_size;
-            back_.i += half_size;
-            size_t index = 0;
-            for(;index < half_size;++index) {
-                newarr[index] = reinterpret_cast<T*>(new char[SIZE_OF_BUCKET*sizeof(T)]);
+            const size_t new_size = arr_size_ * SIZE_SCALE;
+            T** new_arr = nullptr;
+            size_t half = arr_size_/2;
+
+            try{
+                new_arr =  new T*[new_size]{nullptr};
+                
+                for (size_t i = 0; i < half; ++i) {
+                    new_arr[i] = reinterpret_cast<T*>(new char[SIZE_OF_BUCKET * sizeof(T)]);
+                }
+
+                for (size_t i = 0; i < arr_size_; ++i) {
+                    new_arr[i + half] = arr_[i];
+                }
+
+                for (size_t i = half + arr_size_; i < new_size; ++i) {
+                    new_arr[i] = reinterpret_cast<T*>(new char[SIZE_OF_BUCKET * sizeof(T)]);
+                }
+                
+            } 
+            
+            catch(...) {
+                
+                if (new_arr) {
+                    for (size_t i = 0; i < half; ++i)
+                        delete[] reinterpret_cast<char*>(new_arr[i]);
+
+                    for (size_t i = half + arr_size_; i < new_size; ++i)
+                        delete[] reinterpret_cast<char*>(new_arr[i]);
+
+                    delete[] new_arr;
+                }
+                throw;
             }
-            for(int i = 0;index < arr_size_ + half_size;++index, ++i) {
-                newarr[index] = arr_[i]; 
-            }
-            arr_size_ *= SIZE_SCALE;
-            for(;index < arr_size_ ;++index) {
-                newarr[index] = reinterpret_cast<T*>(new char[SIZE_OF_BUCKET*sizeof(T)]);
-            }
-            delete[] reinterpret_cast<char*>(arr_);
-            arr_ = newarr; 
+
+
+            delete[] arr_;
+            
+            arr_ = new_arr; 
+            front_.i += half;
+            back_.i += half;
+            arr_size_ = new_size;
         }
+        back_.j = 0;
     }
     new(arr_[back_.i] + back_.j) T(val);
 }
@@ -128,17 +169,30 @@ void my_deque<T>::push_back(const T& val) {
 
 template <typename T>
 void my_deque<T>::push_front(const T& val) {
-    ++size_;
     if(!arr_) {
-        arr_ = new T*[DEFAULT_SIZE];
-        arr_size_ = DEFAULT_SIZE;
+        T** new_arr = nullptr;
+        size_t index = 0;
+        try{
+            new_arr = new T*[DEFAULT_SIZE];
+
+            for(; index < DEFAULT_SIZE;++index){
+                new_arr[index] = reinterpret_cast<T*>(new char[SIZE_OF_BUCKET*sizeof(T)]);
+            }
+            new(new_arr[1]) T(val); 
+
+        } catch(...) {
+            for(size_t i = 0;i < index;++i){
+                delete[] reinterpret_cast<char*>(new_arr[i]);
+            }
+            delete[] new_arr;
+            throw;
+        }
+
+        arr_ = new_arr;
         front_.i = back_.i = 1;
         front_.j = back_.j = 0;
-        for(size_t i = 0; i < arr_size_;++i){
-            arr_[i] = reinterpret_cast<T*>(new char[SIZE_OF_BUCKET*sizeof(T)]);
-        }
-            
-        new(arr_[back_.i]) T(val); // check if this throw and how it. next time !!!
+        arr_size_ = DEFAULT_SIZE;
+        ++size_;     
         return;
     }
 
@@ -147,23 +201,45 @@ void my_deque<T>::push_front(const T& val) {
 
         if(front_.i == 0){
             // reallocate
-            T** newarr = new T*[arr_size_* SIZE_SCALE];
-            size_t half_size = arr_size_/2;
-            front_.i += half_size;
-            back_.i += half_size;
-            size_t index = 0;
-            for(;index < half_size;++index) {
-                newarr[index] = reinterpret_cast<T*>(new char[SIZE_OF_BUCKET*sizeof(T)]);
+            const size_t new_size = arr_size_ * SIZE_SCALE;
+            T** new_arr = nullptr;
+            size_t half = arr_size_/2;
+
+            try{
+                new_arr =  new T*[new_size]{nullptr};
+
+                for (size_t i = 0; i < half; ++i) {
+                    new_arr[i] = reinterpret_cast<T*>(new char[SIZE_OF_BUCKET * sizeof(T)]);
+                }
+
+                for (size_t i = 0; i < arr_size_; ++i) {
+                    new_arr[i + half] = arr_[i];
+                }
+
+                for (size_t i = half + arr_size_; i < new_size; ++i) {
+                    new_arr[i] = reinterpret_cast<T*>(new char[SIZE_OF_BUCKET * sizeof(T)]);
+                }
+            } 
+            
+            catch(...) {
+                
+                if (new_arr) {
+                    for (size_t i = 0; i < half; ++i)
+                        delete[] reinterpret_cast<char*>(new_arr[i]);
+
+                    for (size_t i = half + arr_size_; i < new_size; ++i)
+                        delete[] reinterpret_cast<char*>(new_arr[i]);
+
+                    delete[] new_arr;
+                }
+                throw;
             }
-            for(int i = 0;index < arr_size_ + half_size;++index, ++i) {
-                newarr[index] = arr_[i]; 
-            }
-            arr_size_ *= SIZE_SCALE;
-            for(;index < arr_size_ ;++index) {
-                newarr[index] = reinterpret_cast<T*>(new char[SIZE_OF_BUCKET*sizeof(T)]);
-            }
-            delete[] reinterpret_cast<char*>(arr_);
-            arr_ = newarr; 
+
+            delete[] arr_;
+            arr_ = new_arr;
+            front_.i += half;
+            back_.i += half;
+            arr_size_ = new_size; 
         }
         --front_.i;
         new(arr_[front_.i] + front_.j) T(val);
@@ -172,6 +248,8 @@ void my_deque<T>::push_front(const T& val) {
         --front_.j;
         new(arr_[front_.i] + front_.j) T(val);
     }
+    ++size_;
+
 }
 
 template <typename T>
@@ -260,24 +338,29 @@ int main() {
     // for(int i = 0; i < 2000;++i) {
     //     std::cout << d[i] << ' ';
     // }
- 
     my_deque<std::vector<int>> d;
-    for(int i = 0; i < 400;++i) {
-        std::vector<int> v{i,i*i};
+ 
+    try{
+        for(int i = 0; i < 400;++i) {
+            std::vector<int> v{i,i*i};
+            d.push_front(v);
 
-        d.push_front(v);
-        d.push_back(v);
+            d.push_back(v);
+        }
+    }
+    catch(...){
+        return 0;
     }
 
-    my_deque<std::vector<int>> dd;
-    dd = d;
-    for(int i = 0; i < 800;++i) {
-        dd[i][0] = 12;
-    }
-    for(int i = 0; i < 800;++i) {
-        std::cout << dd[i][0] << ' ' << dd[i][1] << ' '; 
+    // my_deque<std::vector<int>> dd;
+    // dd = d;
+    // for(int i = 0; i < 400;++i) {
+    //     dd[i][0] = 12;
+    // }
+    // for(int i = 0; i < 400;++i) {
+    //     std::cout << dd[i][0] << ' ' << dd[i][1] << ' '; 
         
-    }
+    // }
 
 
     // for(int i = 0; i < 400;++i) {
