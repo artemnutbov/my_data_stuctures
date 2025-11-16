@@ -40,31 +40,90 @@ public:
 
 
 template <typename T>
-my_deque<T>::my_deque(const my_deque& other):arr_(new T*[other.arr_size_]),front_(other.front_),back_(other.back_),size_(other.size_),arr_size_(other.arr_size_) {
-    for(size_t i = 0; i < arr_size_;++i){
-        arr_[i] = reinterpret_cast<T*>(new char[SIZE_OF_BUCKET*sizeof(T)]);
+my_deque<T>::my_deque(const my_deque& other):arr_(nullptr),front_(other.front_),back_(other.back_),size_(other.size_),arr_size_(other.arr_size_) {
+    T** new_arr = new T*[other.arr_size_];
+    size_t index_start = 0;
+    try{
+        for(; index_start < arr_size_;++index_start){
+            new_arr[index_start] = reinterpret_cast<T*>(new char[SIZE_OF_BUCKET*sizeof(T)]);
+        }
+    } catch(...) {
+        for(size_t i = 0;i < index_start;++i){
+            delete[] reinterpret_cast<char*>(new_arr[i]);
+        }
+        delete[] new_arr;
+        throw;
     }
-
+    index_start = front_.j;
+    
     if(front_.i == back_.i) {
-        for(size_t i = front_.j;i <= back_.j; ++i)
-            new(arr_[front_.i] + i) T(other.arr_[front_.i][i]);
+        try{  
+            for(;index_start <= back_.j; ++index_start)
+                new(new_arr[front_.i] + index_start) T(other.arr_[front_.i][index_start]);
+        } catch(...) {
+            for(size_t i = front_.j;i < index_start;++i){
+                (new_arr[front_.i] + i)->~T();
+            }
+            for(size_t i = 0; i < arr_size_;++i){
+                delete[] reinterpret_cast<char*>(new_arr[i]);
+            }
+            delete[] new_arr;
+            throw;
+        }
     }
     else {
-        for(size_t i = front_.j;i < SIZE_OF_BUCKET; ++i)
-            new(arr_[front_.i] + i) T(other.arr_[front_.i][i]);
-                
-            
-        for(size_t i = front_.i + 1;i < back_.i ;++i) {
-            for(size_t j = 0;j < SIZE_OF_BUCKET;++j) {
-                new(arr_[i] + j) T(other.arr_[i][j]);
+        size_t index_end = 0;
+        size_t middle_index_i = front_.i + 1;
+
+        try{
+            for(;index_start < SIZE_OF_BUCKET; ++index_start)
+                new(new_arr[front_.i] + index_start) T(other.arr_[front_.i][index_start]);
+
+
+            for(; middle_index_i < back_.i; ++middle_index_i) {
+                size_t constructed = 0;
+                try {
+                    for(; constructed < SIZE_OF_BUCKET; ++constructed)
+                        new(new_arr[middle_index_i] + constructed) T(other.arr_[middle_index_i][constructed]);
+                    
+                } catch(...) {
+                    for(size_t j = 0; j < constructed; ++j)
+                        (new_arr[middle_index_i] + j)->~T();
+                    throw;
+                }
             }
+            size_t counter = 0;
+            for(;index_end <= back_.j; ++index_end){
+                new(new_arr[back_.i] + index_end) T(other.arr_[back_.i][index_end]);
+                ++counter;
+
+            }
+
+
+        } catch(...) {
+            for(size_t i = front_.j;i < index_start;++i){
+                (new_arr[front_.i] + i)->~T();
+            }
+
+            for(size_t i = front_.i + 1;i < middle_index_i;++i) {
+                for(size_t j = 0;j < SIZE_OF_BUCKET  ;++j) {
+                    (new_arr[i] + j)->~T();
+                }
+            }
+
+            for(size_t i = 0;i < index_end;++i){
+                (new_arr[back_.i] + i)->~T();
+            }
+
+            for(size_t i = 0; i < arr_size_;++i){
+                delete[] reinterpret_cast<char*>(new_arr[i]);
+            }
+            delete[] new_arr;
+            throw;
         }
-
-        for(size_t i = 0;i <= back_.j; ++i)
-            new(arr_[back_.i] + i) T(other.arr_[back_.i][i]);
-
     }
-    // need to write exception safety
+    arr_ = new_arr;
+    
 }
 
 template <typename T>
@@ -341,33 +400,35 @@ int main() {
     my_deque<std::vector<int>> d;
  
     try{
-        for(int i = 0; i < 400;++i) {
+        for(int i = 0; i < 4;++i) {
             std::vector<int> v{i,i*i};
-            d.push_front(v);
+            //d.push_front(v);
 
             d.push_back(v);
         }
+        
+        my_deque<std::vector<int>> dd;
+        dd = d;
+        for(int i = 0; i < 4;++i) {
+            dd[i][0] = 12;
+        }
+        for(int i = 0; i < 4;++i) {
+            std::cout << dd[i][0] << ' ' << dd[i][1] << ' '; 
+            
+        }
+
+
+        for(int i = 0; i < 4;++i) {
+            std::vector<int> v{i,2,3,4,5};
+            dd.push_front(v);
+            dd.push_back(v);
+        }
+        my_deque<std::vector<int>> ddd = dd;
+
     }
     catch(...){
+        std::cerr << "\ncaught!!\n";
         return 0;
     }
-
-    // my_deque<std::vector<int>> dd;
-    // dd = d;
-    // for(int i = 0; i < 400;++i) {
-    //     dd[i][0] = 12;
-    // }
-    // for(int i = 0; i < 400;++i) {
-    //     std::cout << dd[i][0] << ' ' << dd[i][1] << ' '; 
-        
-    // }
-
-
-    // for(int i = 0; i < 400;++i) {
-    //     std::vector<int> v{i,2,3,4,5};
-    //     dd.push_front(v);
-    //     dd.push_back(v);
-    // }
-    // my_deque<std::vector<int>> ddd = dd;
-    
+    std::cout << "\n\n\n\n++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";    
 }
