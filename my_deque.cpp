@@ -25,7 +25,10 @@ public:
     
     my_deque() = default;
     my_deque(const my_deque& other);
-    my_deque& operator=(my_deque other);
+    my_deque(my_deque&& other);
+
+    my_deque& operator=(const my_deque& other);
+    my_deque& operator=(my_deque&& other);
     void push_back(const T& val);
     void push_front(const T& val);
     void pop_back();
@@ -126,9 +129,20 @@ my_deque<T>::my_deque(const my_deque& other):arr_(nullptr),front_(other.front_),
     
 }
 
+
 template <typename T>
-my_deque<T>& my_deque<T>::operator=(my_deque other) {
-    swap(other);
+my_deque<T>::my_deque(my_deque<T>&& other):arr_(other.arr_),front_(other.front_),back_(other.back_),size_(other.size_),arr_size_(other.arr_size_) {
+    other.arr_ = nullptr;
+    other.size_ = 0;
+    other.arr_size_ = 0;
+    other.front_ = {0,0};
+    other.back_ = {0,0};
+}
+
+template <typename T>
+my_deque<T>& my_deque<T>::operator=(const my_deque& other) {
+    my_deque<T> tmp(other);
+    swap(tmp);
     return *this;
 }
 
@@ -139,6 +153,49 @@ void my_deque<T>::swap(my_deque& other) {
     std::swap(back_,other.back_);
     std::swap(size_,other.size_);
     std::swap(arr_size_,other.arr_size_);
+}
+
+template <typename T>
+my_deque<T>& my_deque<T>::operator=(my_deque&& other) {
+    if (this != &other) {
+        if(arr_) {
+            if(front_.i == back_.i) {
+                for(size_t i = front_.j;i <= back_.j; ++i)
+                    (arr_[front_.i] + i)->~T();
+            }
+            else {
+                for(size_t i = front_.j;i < SIZE_OF_BUCKET; ++i)
+                    (arr_[front_.i] + i)->~T();
+                
+                for(size_t i = front_.i + 1;i < back_.i ;++i) {
+                    for(size_t j = 0;j < SIZE_OF_BUCKET;++j) {
+                        (arr_[i] + j)->~T();
+                    }
+                }
+
+                for(size_t i = 0;i <= back_.j; ++i)
+                    (arr_[back_.i] + i)->~T();
+            }
+
+            for(size_t i = 0;i < arr_size_;++i){
+                delete[] reinterpret_cast<char*>(arr_[i]);
+            }
+
+            delete[] arr_;
+        }
+        arr_ = other.arr_;
+        size_ = other.size_;
+        arr_size_ = other.arr_size_;
+        front_ = other.front_;
+        back_ = other.back_;
+     
+        other.arr_ = nullptr;
+        other.size_ = 0;
+        other.arr_size_ = 0;
+        other.front_ = {0,0};
+        other.back_ = {0,0};
+    }
+    return *this;
 }
 
 
@@ -423,8 +480,8 @@ int main() {
             dd.push_front(v);
             dd.push_back(v);
         }
-        my_deque<std::vector<int>> ddd = dd;
-
+        my_deque<std::vector<int>> ddd(std::move(dd));
+        ddd = std::move(d);
     }
     catch(...){
         std::cerr << "\ncaught!!\n";
