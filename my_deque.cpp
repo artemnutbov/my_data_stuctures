@@ -20,9 +20,111 @@ class my_deque {
     Index back_;
     size_t size_ = 0;
     size_t arr_size_ = 0;
+
+    template <bool IsConst>
+    class base_iterator {
+    public:
+        using pointer_type = std::conditional_t<IsConst, const T*, T*>;
+        using reference_type = std::conditional_t<IsConst, const T&, T&>;
+        
+        using pointer_arr_type = std::conditional_t<IsConst, const T**, T**>;
+        using reference_arr_type = std::conditional_t<IsConst, const T*&, T*&>;
+        
+
+        using value_type = T;
+    private:
+        pointer_arr_type parr_;
+        Index position;
+        base_iterator(T**parr_,Index position):parr_(parr_),position(position) {}
+        friend class my_deque<T>;
+    public:
+        base_iterator(const base_iterator&) = default;
+        base_iterator& operator=(const base_iterator&) = default;
+        
+        reference_type operator*() const { return parr_[position.i][position.j];}
+        pointer_type operator->() const { return parr_[position.i] + position.j; }
+        
+        base_iterator& operator++() {
+            if(++position.j == SIZE_OF_BUCKET) {
+                position.j = 0;
+                ++position.i;
+            } 
+            return *this;
+        }
+        
+        base_iterator operator++(int) {
+            base_iterator copy = *this;
+           ++(*this); 
+            return copy;
+        }
+
+         base_iterator& operator--() {
+            if(position.j == 0) {
+                position.j = SIZE_OF_BUCKET - 1;
+                --position.i;
+            } 
+            else
+                --position.j;
+            return *this;
+        }
+        
+        base_iterator operator--(int) {
+            base_iterator copy = *this;
+            --(*this); 
+            return copy;
+        }
+        bool operator==(const base_iterator& other) {
+            return (position.i == other.position.i) && (position.j == other.position.j);
+        }
+
+        bool operator!=(const base_iterator& other) {
+            return !(*this == other);
+        }
+
+
+        operator base_iterator<true>() const {
+            return  parr_[position.i] + position.j;
+        }
+    };
 public:
-    using value_type = T;
+    using iterator = base_iterator<false>;
+    using const_iterator = base_iterator<true>;
+    using reverse_iterator = std::reverse_iterator<iterator>;
+    using const_reverse_iterator = std::reverse_iterator<const_iterator>;
     
+    
+    iterator begin() {
+        return {arr_,front_};
+    }
+
+    iterator end() {
+        if(back_.j == SIZE_OF_BUCKET - 1)
+            return {arr_ ,{back_.i+1,0}};
+        return {arr_,{back_.i,back_.j+1}};
+    
+    }
+
+    
+    const_iterator begin() const {
+        return {arr_,front_};
+    }
+
+    const_iterator end() const {
+        if(back_.j == SIZE_OF_BUCKET - 1)
+            return {arr_ ,{back_.i+1,0}};
+        return {arr_,{back_.i,back_.j+1}};
+    }
+
+    const_iterator cbegin() const {
+        return {arr_ ,front_};
+    }
+
+    const_iterator cend() const{
+        if(back_.j == SIZE_OF_BUCKET - 1)
+            return {arr_ ,{back_.i+1,0}};
+        return {arr_,{back_.i,back_.j+1}};
+    }
+
     my_deque() = default;
     my_deque(const my_deque& other);
     my_deque(my_deque&& other);
@@ -454,27 +556,47 @@ int main() {
     // for(int i = 0; i < 2000;++i) {
     //     std::cout << d[i] << ' ';
     // }
-    my_deque<std::vector<int>> d;
- 
-    try{
-        for(int i = 0; i < 4;++i) {
-            std::vector<int> v{i,i*i};
-            //d.push_front(v);
 
-            d.push_back(v);
-        }
+    my_deque<int> d;
+    for(int i = 0; i < 40;++i) {
+        d.push_back(i);
+    }
+    for(auto i : d) {
+        std::cout << i << '\t';
+    }
+    // for(auto i = d.begin();i != d.end();i++) {
+    //     *i = 5;
+    // }
+    // for(auto i : d) {
+    //     std::cout << i << '\t';
+    // }
+    std::cout << '\n';
+    const my_deque<int>::iterator it = d.begin();
+    //std::cout << *it << *(it++) << '\n';
+    std::cout << *it << '\n';
+    
+    
+    
+    // try{
+    //     for(int i = 0; i < 4;++i) {
+    //         std::vector<int> v{i,i*i};
+    //         //d.push_front(v);
+
+    //         d.push_back(v);
+    //     }
         
-        my_deque<std::vector<int>> dd;
-        dd = d;
-        for(int i = 0; i < 4;++i) {
-            dd[i][0] = 12;
-        }
-        for(int i = 0; i < 4;++i) {
-            std::cout << dd[i][0] << ' ' << dd[i][1] << ' '; 
+    //     my_deque<std::vector<int>> dd;
+    //     dd = d;
+    //     for(int i = 0; i < 4;++i) {
+    //         dd[i][0] = 12;
+    //     }
+    //     for(int i = 0; i < 4;++i) {
+    //         std::cout << dd[i][0] << ' ' << dd[i][1] << ' '; 
             
-        }
+    //     }
 
 
+<<<<<<< HEAD
         for(int i = 0; i < 4;++i) {
             std::vector<int> v{i,2,3,4,5};
             dd.push_front(v);
@@ -487,5 +609,19 @@ int main() {
         std::cerr << "\ncaught!!\n";
         return 0;
     }
+=======
+    //     for(int i = 0; i < 4;++i) {
+    //         std::vector<int> v{i,2,3,4,5};
+    //         dd.push_front(v);
+    //         dd.push_back(v);
+    //     }
+    //     my_deque<std::vector<int>> ddd = dd;
+
+    // }
+    // catch(...){
+    //     std::cerr << "\ncaught!!\n";
+    //     return 0;
+    // }
+>>>>>>> feature_iterator
     std::cout << "\n\n\n\n++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";    
 }
