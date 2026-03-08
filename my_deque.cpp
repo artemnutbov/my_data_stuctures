@@ -1,9 +1,5 @@
 #include <iostream>
 
-#define SIZE_OF_BUCKET 32
-#define DEFAULT_SIZE 2
-#define SIZE_SCALE 2
-
 struct Index {
     size_t i;
     size_t j;
@@ -18,6 +14,10 @@ class my_deque {
     Index back_;
     size_t size_ = 0;
     size_t arr_size_ = 0;
+
+    static constexpr size_t SIZE_OF_BUCKET = 32;
+    static constexpr size_t SIZE_SCALE = 2;
+    static constexpr size_t DEFAULT_SIZE = 2;
 
     template <bool IsConst>
     class base_iterator {
@@ -369,6 +369,7 @@ void my_deque<T>::push_back(const T& val) {
         back_.j = 0;
     }
     new (arr_[back_.i] + back_.j) T(val);
+    ++size_;
 }
 
 template <typename T>
@@ -454,6 +455,7 @@ void my_deque<T>::push_front(const T& val) {
 
 template <typename T>
 void my_deque<T>::pop_back() {
+    if (size_ == 0) return;
     --size_;
     if (!arr_) return;
     (arr_[back_.i] + back_.j)->~T();
@@ -466,6 +468,7 @@ void my_deque<T>::pop_back() {
 
 template <typename T>
 void my_deque<T>::pop_front() {
+    if (size_ == 0) return;
     --size_;
     if (!arr_) return;
     (arr_[front_.i] + front_.j)->~T();
