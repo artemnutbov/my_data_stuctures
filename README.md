@@ -1,6 +1,6 @@
 # My C++ Data Structures
 
-This repo is a collection of my custom data structures that I code while studying C++. It's not a replacement  STL, I just want to know how some containers work under the hood. Some of the data structures are a 
+This repo is a collection of my custom data structures that I code while studying C++. It's not a replacement  STL, I just want to know how some containers work under the hood. Some of the data structures are a bit 
 messy(the early ones, specifically). Additionally, for `my_string`, `my_forward_list` and `my_linked_list` you need C++ 20.
 
 
