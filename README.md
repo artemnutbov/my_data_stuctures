@@ -4,7 +4,7 @@ This repo is a collection of my custom data structures that I code while studyin
 messy(the early ones, specifically). Additionally, for `my_string`, `my_forward_list` and `my_linked_list` you need C++ 20.
 
 
- To build these, I explored three different memory mechanics. For `my_string`, `my_forward_list` and 2 hash tables(collision handling via open addressing and separate chaining), I use raw `new` and `delete`. For `my_linked_list` use `std::allocator_traits`. 
+ To build these, I use three different memory mechanics. For `my_string`, `my_forward_list` and 2 hash tables(collision handling via open addressing and separate chaining), I use raw `new` and `delete`. For `my_linked_list` use `std::allocator_traits`. 
   And for `my_deque` use placement `new` and explicit destructor calls(`->~T()`) with `try. . .catch` blocks to provide the Strong Exception Guarantee.
 
 *  `my_string`: It includes implementation of the Knuth-Morris-Pratt(KMP) algorithm for substring searching. And spaceship operator(<=>) implementation.
