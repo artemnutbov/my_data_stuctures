@@ -4,7 +4,7 @@ This repo is a collection of my custom data structures that I code while studyin
 messy(the early ones, specifically). Additionally, for `my_string`, `my_forward_list` and `my_linked_list` you need C++ 20.
 
 
- To build these, I use three different memory mechanics. For `my_string`, `my_forward_list` and 2 hash tables(collision handling via open addressing and separate chaining), I use raw `new` and `delete`. For `my_linked_list` use `std::allocator_traits`. 
+ To build these, I use three different memory mechanics. For `my_string`, `my_forward_list` and 2 hash tables(collision handling via open addressing and separate chaining), I use raw `new` and `delete`. For `my_linked_list` use `std::allocator_traits`. Also, I implemented a stateful StackAllocator.
   And for `my_deque` use placement `new` and explicit destructor calls(`->~T()`) with `try. . .catch` blocks to provide the Strong Exception Guarantee.
 
 *  `my_string`: It includes implementation of the Knuth-Morris-Pratt(KMP) algorithm for substring searching. And spaceship operator(<=>) implementation.
@@ -20,6 +20,7 @@ messy(the early ones, specifically). Additionally, for `my_string`, `my_forward_
 *  `my_deque`: Implemented using a 2D pointer array to fixed-size buckets. Achieves O(1) time complexity for `push_front`, `pop_front`, `push_back` and  `pop_back`.
   Overloaded `operator[]` calculates the bucket and offset in O(1) time. `base_iterator` uses a template parameter(`<bool IsConst>`)  for  `std::conditional_t` to generate  `iterator` and `const_iterator`
   types without duplicating code. Making `my_deque` fully compatible with `<algorithm>`. Also, done Rule of Five.
+*  `StackAllocator`: A stateful, custom allocator designed to manage a pre-allocated memory buffer. It is fully compliant with std::allocator_traits. To ensure proper memory alignment, it uses std::align and stores metadata byte (the shift offset) right before the memory address. Note that due to its LIFO structure, deallocations work correctly only if ordered in the exact reverse of their original allocation.
 
 > "What I cannot create, I do not understand." 
 
