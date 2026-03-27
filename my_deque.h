@@ -263,6 +263,16 @@ public:
     }
 
     void push_back(const T& val) {
+        emplace_back(val);
+    }
+
+    void push_back(T&& val) {
+        emplace_back(std::move(val));
+    }
+
+    // forward reference
+    template <typename... Args>
+    T& emplace_back(Args&&... args) {
         if (!arr_) {
             T** new_arr = nullptr;
             size_t index = 0;
@@ -272,7 +282,7 @@ public:
                 for (; index < DEFAULT_SIZE; ++index) {
                     new_arr[index] = node_traits::allocate(node_alloc_, SIZE_OF_BUCKET);
                 }
-                node_traits::construct(node_alloc_, new_arr[1], val);
+                node_traits::construct(node_alloc_, new_arr[1], std::forward<Args>(args)...);
             } catch (...) {
                 for (size_t i = 0; i < index; ++i) {
                     node_traits::deallocate(node_alloc_, new_arr[i], SIZE_OF_BUCKET);
@@ -287,7 +297,7 @@ public:
             front_.j = back_.j = 0;
             arr_size_ = DEFAULT_SIZE;
             ++size_;
-            return;
+            return arr_[1][0];
         }
 
         Index old_back = back_;
@@ -346,8 +356,10 @@ public:
             back_.j = 0;
         }
         try {
-            node_traits::construct(node_alloc_, arr_[back_.i] + back_.j, val);
+            node_traits::construct(node_alloc_, arr_[back_.i] + back_.j,
+                                   std::forward<Args>(args)...);
             ++size_;
+            return arr_[back_.i][back_.j];
         } catch (...) {
             back_ = old_back;
             throw;
@@ -355,6 +367,16 @@ public:
     }
 
     void push_front(const T& val) {
+        emplace_front(val);
+    }
+
+    void push_front(T&& val) {
+        emplace_front(std::move(val));
+    }
+
+    // forward reference
+    template <typename... Args>
+    T& emplace_front(Args&&... args) {
         if (!arr_) {
             T** new_arr = nullptr;
             size_t index = 0;
@@ -364,7 +386,7 @@ public:
                 for (; index < DEFAULT_SIZE; ++index) {
                     new_arr[index] = node_traits::allocate(node_alloc_, SIZE_OF_BUCKET);
                 }
-                node_traits::construct(node_alloc_, new_arr[1], val);
+                node_traits::construct(node_alloc_, new_arr[1], std::forward<Args>(args)...);
 
             } catch (...) {
                 for (size_t i = 0; i < index; ++i) {
@@ -379,7 +401,7 @@ public:
             front_.j = back_.j = 0;
             arr_size_ = DEFAULT_SIZE;
             ++size_;
-            return;
+            return arr_[1][0];
         }
         Index old_front = front_;
         if (front_.j == 0) {
@@ -438,8 +460,10 @@ public:
             --front_.j;
         }
         try {
-            node_traits::construct(node_alloc_, arr_[front_.i] + front_.j, val);
+            node_traits::construct(node_alloc_, arr_[front_.i] + front_.j,
+                                   std::forward<Args>(args)...);
             ++size_;
+            return arr_[front_.i][front_.j];
         } catch (...) {
             front_ = old_front;
             throw;
