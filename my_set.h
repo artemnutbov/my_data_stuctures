@@ -35,10 +35,10 @@ class my_set {
 
     static constexpr bool RED = true;
     static constexpr bool BLACK = false;
-    BaseNode _header;  // fake node. left the biggest element, right the smallest
+    BaseNode header_;  // fake node. left the biggest element, right the smallest
     [[no_unique_address]] Compare _cmp;
     [[no_unique_address]] node_allocator _alloc;
-    size_t _size = 0;
+    size_t size_ = 0;
 
     template <bool IsConst>
     class base_iterator {
@@ -119,8 +119,8 @@ class my_set {
         leaf->left = parent;
         parent->parent = leaf;
 
-        if (leaf->parent == &_header)
-            _header.parent = leaf;
+        if (leaf->parent == &header_)
+            header_.parent = leaf;
         else if (leaf->parent->left == parent)
             leaf->parent->left = leaf;
         else
@@ -136,8 +136,8 @@ class my_set {
         leaf->right = parent;
         parent->parent = leaf;
 
-        if (leaf->parent == &_header)
-            _header.parent = leaf;
+        if (leaf->parent == &header_)
+            header_.parent = leaf;
         else if (leaf->parent->left == parent)
             leaf->parent->left = leaf;
         else
@@ -145,7 +145,7 @@ class my_set {
     }
 
     void fixInsert(BaseNode *leaf) {
-        while (leaf != _header.parent && static_cast<Node *>(leaf->parent)->is_red) {
+        while (leaf != header_.parent && static_cast<Node *>(leaf->parent)->is_red) {
             BaseNode *gp = leaf->parent->parent;
             if (leaf->parent == gp->left) {                                 // if left child
                 if (gp->right && static_cast<Node *>(gp->right)->is_red) {  // Check uncle color
@@ -178,16 +178,16 @@ class my_set {
                     leftRotate(leaf->parent);
                 }
             }
-            static_cast<Node *>(_header.parent)->is_red = BLACK;
+            static_cast<Node *>(header_.parent)->is_red = BLACK;
         }
-        ++_size;
+        ++size_;
     }
 
     void deleteFix(BaseNode *node_to_delete) {
         if (!node_to_delete->left && !node_to_delete->right) {  // no children
-            if (node_to_delete == _header.parent) {
-                _header.parent = nullptr;
-                _header.right = &_header;  // begin == end
+            if (node_to_delete == header_.parent) {
+                header_.parent = nullptr;
+                header_.right = &header_;  // begin == end
             } else {
                 if (!(static_cast<Node *>(node_to_delete)->is_red)) {
                     fixDoubleBlack(node_to_delete);
@@ -206,13 +206,13 @@ class my_set {
             // delete node_to_delete;
             node_alloc_traits::destroy(_alloc, static_cast<Node *>(node_to_delete));
             node_alloc_traits::deallocate(_alloc, static_cast<Node *>(node_to_delete), 1);
-            --_size;
+            --size_;
             return;
         } else {
             BaseNode *child = node_to_delete->left ? node_to_delete->left : node_to_delete->right;
-            if (node_to_delete == _header.parent) {
-                child->parent = &_header;
-                _header.parent = child;
+            if (node_to_delete == header_.parent) {
+                child->parent = &header_;
+                header_.parent = child;
                 static_cast<Node *>(node_to_delete)->is_red = BLACK;
                 // delete node_to_delete;
 
@@ -236,10 +236,10 @@ class my_set {
                 node_alloc_traits::deallocate(_alloc, static_cast<Node *>(node_to_delete), 1);
             }
         }
-        --_size;
+        --size_;
     }
     void fixDoubleBlack(BaseNode *current) {
-        while (current != _header.parent) {
+        while (current != header_.parent) {
             BaseNode *sibling = current->sibling();
             BaseNode *parent = current->parent;
             if (!sibling) {
@@ -319,10 +319,10 @@ class my_set {
             else
                 parent->right = new_node;
 
-            if (_cmp(new_node->key, static_cast<Node *>(_header.right)->key))
-                _header.right = new_node;
-            if (_cmp(static_cast<Node *>(_header.left)->key, new_node->key))
-                _header.left = new_node;
+            if (_cmp(new_node->key, static_cast<Node *>(header_.right)->key))
+                header_.right = new_node;
+            if (_cmp(static_cast<Node *>(header_.left)->key, new_node->key))
+                header_.left = new_node;
 
             inorderCopyConstructor(node->left, new_node);
             inorderCopyConstructor(node->right, new_node);
@@ -361,52 +361,65 @@ public:
     using const_reference = const value_type &;
 
     my_set(const my_set &other) {
-        if (!other._header.parent) {
-            _header.right = &_header;
+        if (!other.header_.parent) {
+            header_.right = &header_;
             return;
         }
 
         Node *new_node = node_alloc_traits::allocate(_alloc, 1);
         try {
             node_alloc_traits::construct(_alloc, new_node,
-                                         static_cast<Node *>(other._header.parent)->key, BLACK);
+                                         static_cast<Node *>(other.header_.parent)->key, BLACK);
         } catch (...) {
             node_alloc_traits::deallocate(_alloc, new_node, 1);
         }
 
-        _header.parent = new_node;
-        _header.parent->parent = &_header;
+        header_.parent = new_node;
+        header_.parent->parent = &header_;
 
-        _header.left = _header.parent;
-        _header.right = _header.parent;
+        header_.left = header_.parent;
+        header_.right = header_.parent;
 
-        inorderCopyConstructor(other._header.parent->left, _header.parent);
-        inorderCopyConstructor(other._header.parent->right, _header.parent);
-        _size = other._size;
+        inorderCopyConstructor(other.header_.parent->left, header_.parent);
+        inorderCopyConstructor(other.header_.parent->right, header_.parent);
+        size_ = other.size_;
+    }
+
+    my_set &operator=(my_set other) {
+        swap(other);
+        return *this;
+    }
+    void swap(my_set &other) {
+        std::swap(header_, other.header_);
+        std::swap(size_, other.size_);
+        if (!header_.parent)
+            header_.right = &header_;
+        else
+            header_.parent->parent = &header_;
     }
 
     my_set() {
-        _header.right = &_header;
+        header_.right = &header_;
     }
 
     iterator begin() {
-        return {_header.right};
+        return {header_.right};
     }
 
     iterator end() {
-        return {&_header};
+        return {&header_};
     }
 
     const_iterator begin() const {
-        return {_header.right};
+        return {header_.right};
     }
 
     const_iterator end() const {
-        return {&_header};
+        return {&header_};
     }
 
     void erase(const value_type &key) {
-        BaseNode *current = _header.parent;
+        BaseNode *current = header_.parent;
         while (current) {
             if (static_cast<Node *>(current)->key == key)
                 break;
@@ -417,12 +430,12 @@ public:
         }
         if (!current) return;
 
-        if (!(current == _header.parent && !current->left && !current->right)) {  //
+        if (!(current == header_.parent && !current->left && !current->right)) {  //
             // the smallest and the biggest node always have one child
-            if (key == (static_cast<Node *>(_header.left))->key)
-                decrementSuccessor(_header.left);
-            else if (key == (static_cast<Node *>(_header.right))->key)
-                incrementSuccessor(_header.right);
+            if (key == (static_cast<Node *>(header_.left))->key)
+                decrementSuccessor(header_.left);
+            else if (key == (static_cast<Node *>(header_.right))->key)
+                incrementSuccessor(header_.right);
         }
 
         // handle node that have 2 children
@@ -432,7 +445,7 @@ public:
 
             // relink
             BaseNode *tmp = successor->right;
-            if (current->parent == &_header)
+            if (current->parent == &header_)
                 current->parent->parent = successor;
             else if (current->isOnLeft())
                 current->parent->left = successor;
@@ -462,7 +475,7 @@ public:
     }
 
     void insert(const value_type &key) {
-        if (!_header.parent) {
+        if (!header_.parent) {
             Node *new_node = node_alloc_traits::allocate(_alloc, 1);
             try {
                 node_alloc_traits::construct(_alloc, new_node, key, BLACK);
@@ -470,14 +483,14 @@ public:
                 node_alloc_traits::deallocate(_alloc, new_node, 1);
                 throw;
             }
-            _header.parent = new_node;
-            _header.parent->parent = &_header;
+            header_.parent = new_node;
+            header_.parent->parent = &header_;
 
-            _header.left = _header.parent;
-            _header.right = _header.parent;
+            header_.left = header_.parent;
+            header_.right = header_.parent;
             return;
         }
-        BaseNode *current_key = _header.parent;
+        BaseNode *current_key = header_.parent;
         while (current_key) {
             if (_cmp(static_cast<Node *>(current_key)->key, key)) {
                 if (!current_key->right) {
@@ -489,10 +502,10 @@ public:
                     }
                     current_key->right = new_node;
                     new_node->parent = current_key;
-                    if (_cmp(new_node->key, static_cast<Node *>(_header.right)->key))
-                        _header.right = new_node;
-                    if (_cmp(static_cast<Node *>(_header.left)->key, new_node->key))
-                        _header.left = new_node;
+                    if (_cmp(new_node->key, static_cast<Node *>(header_.right)->key))
+                        header_.right = new_node;
+                    if (_cmp(static_cast<Node *>(header_.left)->key, new_node->key))
+                        header_.left = new_node;
                     fixInsert(new_node);
 
                     break;
@@ -508,10 +521,10 @@ public:
                     }
                     current_key->left = new_node;
                     new_node->parent = current_key;
-                    if (_cmp(new_node->key, static_cast<Node *>(_header.right)->key))
-                        _header.right = new_node;
-                    if (_cmp(static_cast<Node *>(_header.left)->key, new_node->key))
-                        _header.left = new_node;
+                    if (_cmp(new_node->key, static_cast<Node *>(header_.right)->key))
+                        header_.right = new_node;
+                    if (_cmp(static_cast<Node *>(header_.left)->key, new_node->key))
+                        header_.left = new_node;
                     fixInsert(new_node);
 
                     break;
@@ -522,7 +535,7 @@ public:
     }
 
     iterator upper_bound(const value_type &key) {
-        BaseNode *current = _header.parent;
+        BaseNode *current = header_.parent;
         while (current) {
             if (key == static_cast<Node *>(current)->key) break;
             if (_cmp(key, static_cast<Node *>(current)->key)) current = current->left;
@@ -533,7 +546,7 @@ public:
     }
 
     iterator lower_bound(const value_type &key) {
-        BaseNode *current = _header.parent;
+        BaseNode *current = header_.parent;
         while (current) {
             if (key == static_cast<Node *>(current)->key) return {current};
             if (_cmp(key, static_cast<Node *>(current)->key)) current = current->left;
@@ -544,7 +557,7 @@ public:
     }
 
     iterator find(const value_type &key) {
-        BaseNode *current = _header.parent;
+        BaseNode *current = header_.parent;
         while (current) {
             if (key == static_cast<Node *>(current)->key) return {current};
             if (_cmp(key, static_cast<Node *>(current)->key)) current = current->left;
@@ -553,7 +566,7 @@ public:
         return end();
     }
     const_iterator find(const value_type &key) const {
-        BaseNode *current = _header.parent;
+        BaseNode *current = header_.parent;
         while (current) {
             if (key == static_cast<Node *>(current)->key) return {current};
             if (_cmp(key, static_cast<Node *>(current)->key)) current = current->left;
@@ -562,7 +575,7 @@ public:
         return end();
     }
     size_t count(const value_type &key) {
-        BaseNode *current = _header.parent;
+        BaseNode *current = header_.parent;
         while (current) {
             if (key == static_cast<Node *>(current)->key) return 1;
             if (_cmp(key, static_cast<Node *>(current)->key)) current = current->left;
@@ -571,11 +584,11 @@ public:
         return 0;
     }
     void clear() {
-        deleteTrvl(_header.parent);
-        _size = 0;
+        deleteTrvl(header_.parent);
+        size_ = 0;
     }
     void inorderPrint() {
-        inorder(_header.parent);
+        inorder(header_.parent);
     }
     ~my_set() {
         clear();
