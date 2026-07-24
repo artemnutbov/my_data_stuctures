@@ -304,6 +304,31 @@ class my_set {
         }
     }
 
+    void inorderCopyConstructor(BaseNode *node, BaseNode *parent) {
+        if (node) {
+            Node *new_node = node_alloc_traits::allocate(_alloc, 1);
+            try {
+                node_alloc_traits::construct(_alloc, new_node, static_cast<Node *>(node)->key,
+                                             static_cast<Node *>(node)->is_red);
+            } catch (...) {
+                node_alloc_traits::deallocate(_alloc, new_node, 1);
+            }
+            new_node->parent = parent;
+            if (node->isOnLeft())
+                parent->left = new_node;
+            else
+                parent->right = new_node;
+
+            if (_cmp(new_node->key, static_cast<Node *>(_header.right)->key))
+                _header.right = new_node;
+            if (_cmp(static_cast<Node *>(_header.left)->key, new_node->key))
+                _header.left = new_node;
+
+            inorderCopyConstructor(node->left, new_node);
+            inorderCopyConstructor(node->right, new_node);
+        }
+    }
+
     void inorder(BaseNode *node) {
         if (node) {
             inorder(node->left);
@@ -334,6 +359,31 @@ public:
     using const_pointer = typename node_traits::const_pointer;
     using reference = value_type &;
     using const_reference = const value_type &;
+
+    my_set(const my_set &other) {
+        if (!other._header.parent) {
+            _header.right = &_header;
+            return;
+        }
+
+        Node *new_node = node_alloc_traits::allocate(_alloc, 1);
+        try {
+            node_alloc_traits::construct(_alloc, new_node,
+                                         static_cast<Node *>(other._header.parent)->key, BLACK);
+        } catch (...) {
+            node_alloc_traits::deallocate(_alloc, new_node, 1);
+        }
+
+        _header.parent = new_node;
+        _header.parent->parent = &_header;
+
+        _header.left = _header.parent;
+        _header.right = _header.parent;
+
+        inorderCopyConstructor(other._header.parent->left, _header.parent);
+        inorderCopyConstructor(other._header.parent->right, _header.parent);
+        _size = other._size;
+    }
 
     my_set() {
         _header.right = &_header;
@@ -520,10 +570,14 @@ public:
         }
         return 0;
     }
+    void clear() {
+        deleteTrvl(_header.parent);
+        _size = 0;
+    }
     void inorderPrint() {
         inorder(_header.parent);
     }
     ~my_set() {
-        deleteTrvl(_header.parent);
+        clear();
     }
 };
