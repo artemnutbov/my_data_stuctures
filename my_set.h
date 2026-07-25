@@ -385,10 +385,37 @@ public:
         size_ = other.size_;
     }
 
-    my_set &operator=(my_set other) {
-        swap(other);
+    my_set(my_set &&other) : header_(other.header_), size_(other.size_) {
+        other.size_ = 0;
+        other.header_.right = &other.header_;
+        other.header_.parent = nullptr;
+        if (!header_.parent)
+            header_.right = &header_;
+        else
+            header_.parent->parent = &header_;
+    }
+
+    my_set &operator=(my_set &other) {
+        my_set tmp(other);
+        swap(tmp);
         return *this;
     }
+
+    my_set &operator=(my_set &&other) {
+        if (&other == this) return *this;
+        clear();
+        header_ = other.header_;
+        size_ = other.size_;
+        other.size_ = 0;
+        other.header_.right = &other.header_;
+        other.header_.parent = nullptr;
+        if (!header_.parent)
+            header_.right = &header_;
+        else
+            header_.parent->parent = &header_;
+        return *this;
+    }
+
     void swap(my_set &other) {
         std::swap(header_, other.header_);
         std::swap(size_, other.size_);
