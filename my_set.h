@@ -360,6 +360,13 @@ public:
     using reference = value_type &;
     using const_reference = const value_type &;
 
+    my_set(std::initializer_list<value_type> init) {
+        header_.right = &header_;
+        for (const auto &v : init) {
+            insert(v);
+        }
+    }
+
     my_set(const my_set &other) {
         if (!other.header_.parent) {
             header_.right = &header_;
@@ -538,7 +545,9 @@ public:
                     break;
                 }
                 current_key = current_key->right;
-            } else {
+            } else if (static_cast<Node *>(current_key)->key == key)
+                return;
+            else {
                 if (!current_key->left) {
                     Node *new_node = node_alloc_traits::allocate(_alloc, 1);
                     try {
