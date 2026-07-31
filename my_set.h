@@ -345,6 +345,44 @@ class my_set {
             node_alloc_traits::deallocate(alloc_, static_cast<Node *>(node), 1);
         }
     }
+    void deepCopy(const my_set &other) {
+        header_.right = &header_;
+        if (!other.header_.parent) return;
+
+        Node *new_node = node_alloc_traits::allocate(alloc_, 1);
+        try {
+            node_alloc_traits::construct(alloc_, new_node,
+                                         static_cast<Node *>(other.header_.parent)->key, BLACK);
+        } catch (...) {
+            node_alloc_traits::deallocate(alloc_, new_node, 1);
+            throw;
+        }
+
+        header_.parent = new_node;
+        header_.parent->parent = &header_;
+
+        header_.left = header_.parent;
+        header_.right = header_.parent;
+        try {
+            inorderCopyConstructor(other.header_.parent->left, header_.parent, other.header_);
+            inorderCopyConstructor(other.header_.parent->right, header_.parent, other.header_);
+        } catch (...) {
+            clear();
+            throw;
+        }
+        size_ = other.size_;
+    }
+    void stealMemory(my_set &&other) {
+        header_ = other.header_;
+        size_ = other.size_;
+        other.size_ = 0;
+        other.header_.right = &other.header_;
+        other.header_.parent = nullptr;
+        if (!header_.parent)
+            header_.right = &header_;
+        else
+            header_.parent->parent = &header_;
+    }
 
 public:
     using iterator = base_iterator<false>;
@@ -371,68 +409,61 @@ public:
         }
     }
 
-    my_set(const my_set &other) {
-        if (!other.header_.parent) {
-            header_.right = &header_;
-            return;
-        }
-
-        Node *new_node = node_alloc_traits::allocate(alloc_, 1);
-        try {
-            node_alloc_traits::construct(alloc_, new_node,
-                                         static_cast<Node *>(other.header_.parent)->key, BLACK);
-        } catch (...) {
-            node_alloc_traits::deallocate(alloc_, new_node, 1);
-            throw;
-        }
-
-        header_.parent = new_node;
-        header_.parent->parent = &header_;
-
-        header_.left = header_.parent;
-        header_.right = header_.parent;
-        try {
-            inorderCopyConstructor(other.header_.parent->left, header_.parent, other.header_);
-            inorderCopyConstructor(other.header_.parent->right, header_.parent, other.header_);
-        } catch (...) {
-            clear();
-            throw;
-        }
-        size_ = other.size_;
+    explicit my_set(const Compare &cmp, const Allocator &alloc = Allocator())
+        : cmp_(cmp), alloc_(alloc) {
+        header_.right = &header_;
     }
 
-    my_set(my_set &&other) : header_(other.header_), size_(other.size_) {
-        other.size_ = 0;
-        other.header_.right = &other.header_;
-        other.header_.parent = nullptr;
-        if (!header_.parent)
-            header_.right = &header_;
-        else
-            header_.parent->parent = &header_;
+    explicit my_set(const Allocator &alloc) : header_(), cmp_(), alloc_(alloc) {
+        header_.right = &header_;
+    }
+
+    my_set(const my_set &other, const Allocator &alloc) : cmp_(other.cmp_), alloc_(alloc) {
+        deepCopy(other);
+    }
+
+    my_set(const my_set &other)
+        : cmp_(other.cmp_),
+          alloc_(node_alloc_traits::select_on_container_copy_construction(other.alloc_)) {
+        deepCopy(other);
+    }
+
+    my_set(my_set &&other) : alloc_(std::move(other.alloc_)) {
+        stealMemory(std::move(other));
     }
 
     my_set &operator=(my_set &other) {
-        my_set tmp(other);
+        if (this == &other) return *this;
+        if constexpr (node_alloc_traits::propagate_on_container_copy_assignment::value) {
+            if (alloc_ != other.alloc_) clear();
+            alloc_ = other.alloc_;
+        }
+        my_set tmp(other, alloc_);
         swap(tmp);
         return *this;
     }
 
     my_set &operator=(my_set &&other) {
         if (&other == this) return *this;
-        clear();
-        header_ = other.header_;
-        size_ = other.size_;
-        other.size_ = 0;
-        other.header_.right = &other.header_;
-        other.header_.parent = nullptr;
-        if (!header_.parent)
-            header_.right = &header_;
-        else
-            header_.parent->parent = &header_;
+        if constexpr (node_alloc_traits::propagate_on_container_move_assignment::value) {
+            clear();
+            alloc_ = std::move(other.alloc_);
+            stealMemory(std::move(other));
+        } else if (alloc_ == other.alloc_) {
+            clear();
+            stealMemory(std::move(other));
+        } else {
+            clear();
+            deepCopy(other);
+            other.clear();
+        }
         return *this;
     }
 
     void swap(my_set &other) {
+        if constexpr (node_alloc_traits::propagate_on_container_swap::value)
+            std::swap(alloc_, other.alloc_);
+
         std::swap(header_, other.header_);
         std::swap(size_, other.size_);
         if (!header_.parent)
@@ -639,8 +670,13 @@ public:
         }
         return 0;
     }
+    allocator_type get_allocator() const noexcept {
+        return alloc_;
+    }
     void clear() {
         deleteTrvl(header_.parent);
+        header_.parent = nullptr;
+        header_.right = &header_;
         size_ = 0;
     }
     void inorderPrint() {
