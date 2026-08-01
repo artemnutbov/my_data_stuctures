@@ -24,6 +24,8 @@ class my_set {
         const Key key;
         bool is_red;
         Node(const Key &key, bool is_red) : key(key), is_red(is_red) {}
+        template <typename... Args>
+        Node(bool is_red, Args &&...args) : key(std::forward<Args>(args)...), is_red(is_red) {}
     };
 
     using value_type = Key;
@@ -548,7 +550,7 @@ public:
         deleteFix(current);
     }
 
-    void insert(const value_type &key) {
+    std::pair<iterator, bool> insert(const value_type &key) {
         if (!header_.parent) {
             Node *new_node = node_alloc_traits::allocate(alloc_, 1);
             try {
@@ -562,7 +564,8 @@ public:
 
             header_.left = header_.parent;
             header_.right = header_.parent;
-            return;
+            ++size_;
+            return {{header_.parent}, true};
         }
         BaseNode *current_key = header_.parent;
         while (current_key) {
@@ -581,7 +584,7 @@ public:
 
                     fixInsert(new_node);
 
-                    break;
+                    return {{new_node}, true};
                 }
                 current_key = current_key->right;
             } else if (cmp_(key, static_cast<Node *>(current_key)->key)) {
@@ -598,12 +601,71 @@ public:
                     if (current_key == header_.right) header_.right = new_node;
                     fixInsert(new_node);
 
-                    break;
+                    return {{new_node}, true};
                 }
                 current_key = current_key->left;
             } else
-                return;
+                return {{current_key}, false};
         }
+
+        return {end(), false};
+    }
+
+    template <typename... Args>
+    std::pair<iterator, bool> emplace(Args &&...args) {
+        Node *new_node = node_alloc_traits::allocate(alloc_, 1);
+        try {
+            node_alloc_traits::construct(alloc_, new_node, RED, std::forward<Args>(args)...);
+        } catch (...) {
+            node_alloc_traits::deallocate(alloc_, new_node, 1);
+            throw;
+        }
+
+        if (!header_.parent) {
+            new_node->is_red = BLACK;
+            header_.parent = new_node;
+            header_.parent->parent = &header_;
+
+            header_.left = header_.parent;
+            header_.right = header_.parent;
+            ++size_;
+            return {{header_.parent}, true};
+        }
+        BaseNode *current = header_.parent;
+        bool is_left = false;
+        BaseNode *parent = nullptr;
+        try {
+            while (current) {
+                parent = current;
+                if (cmp_(static_cast<Node *>(current)->key, new_node->key)) {
+                    is_left = false;
+                    current = current->right;
+                } else if (cmp_(new_node->key, static_cast<Node *>(current)->key)) {
+                    is_left = true;
+                    current = current->left;
+                } else {
+                    node_alloc_traits::destroy(alloc_, new_node);
+                    node_alloc_traits::deallocate(alloc_, new_node, 1);
+                    return {{current}, false};
+                }
+            }
+        } catch (...) {
+            node_alloc_traits::destroy(alloc_, new_node);
+            node_alloc_traits::deallocate(alloc_, new_node, 1);
+            throw;
+        }
+
+        new_node->parent = parent;
+        if (is_left) {
+            parent->left = new_node;
+            if (parent == header_.right) header_.right = new_node;
+        } else {
+            parent->right = new_node;
+            if (parent == header_.left) header_.left = new_node;
+        }
+        fixInsert(new_node);
+
+        return {{new_node}, true};
     }
 
     iterator upper_bound(const value_type &key) {
