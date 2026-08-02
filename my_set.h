@@ -424,6 +424,21 @@ public:
         deepCopy(other);
     }
 
+    template <std::ranges::input_range R>
+    my_set(std::from_range_t, R &&rg, const Compare &comp = Compare(),
+           const Allocator &alloc = Allocator())
+        : cmp_(comp), alloc_(alloc) {
+        header_.right = &header_;
+        try {
+            for (auto &&v : rg) {
+                insert(v);
+            }
+        } catch (...) {
+            clear();
+            throw;
+        }
+    }
+
     my_set(const my_set &other)
         : cmp_(other.cmp_),
           alloc_(node_alloc_traits::select_on_container_copy_construction(other.alloc_)) {
@@ -735,7 +750,7 @@ public:
     allocator_type get_allocator() const noexcept {
         return alloc_;
     }
-    void clear() {
+    void clear() noexcept {
         deleteTrvl(header_.parent);
         header_.parent = nullptr;
         header_.right = &header_;
