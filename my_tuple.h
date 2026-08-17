@@ -4,8 +4,9 @@ struct derive_element : T {
     using element_type = T;
 
     using T::T;  // inherit any constructor
-    derive_element(const T& other) : T(other) {}
-    // derive_element(T&&) = default;
+    template <typename U>
+        requires(!std::is_same_v<std::remove_cvref_t<U>, derive_element>)
+    constexpr derive_element(U&& other) : T(std::forward<U>(other)) {}
 
     constexpr decltype(auto) elem(this auto&& self) {
         using CastType = decltype(std::forward_like<decltype(self)>(std::declval<T>()));
@@ -105,6 +106,16 @@ constexpr decltype(auto) get(MyTuple auto&& t) noexcept {
 }
 
 template <typename... Types>
+constexpr my_tuple<Types&...> tie(Types&... args) noexcept {
+    return {args...};
+}
+
+template <typename... Types>
+constexpr my_tuple<Types&&...> forward_as_tuple(Types&&... args) noexcept {
+    return my_tuple<Types&&...>(std::forward<Types>(args)...);
+}
+
+template <typename... Types>
 class my_tuple : public base<std::make_index_sequence<sizeof...(Types)>, Types...> {
 private:
     template <typename SourceTuple, typename... FWDUTypes>
@@ -156,7 +167,7 @@ public:
         requires((sizeof...(Types) == sizeof...(UTypes)) && (sizeof...(Types) >= 1) &&
                  (std::is_constructible_v<Types, UTypes> && ...) &&
                  !(sizeof...(Types) == 1 && (MyTuple<UTypes> && ...)) &&
-                 !(std::reference_constructs_from_temporary_v<Types, UTypes> || ...))
+                 !(std::reference_constructs_from_temporary_v<Types, UTypes &&> || ...))
         : base_type(std::forward<UTypes>(args)...) {}
 
     template <typename... UTypes>
