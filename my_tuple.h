@@ -4,8 +4,10 @@ struct derive_element : T {
     using element_type = T;
 
     using T::T;  // inherit any constructor
+    derive_element(const T& other) : T(other) {}
+    // derive_element(T&&) = default;
 
-    decltype(auto) elem(this auto&& self) {
+    constexpr decltype(auto) elem(this auto&& self) {
         using CastType = decltype(std::forward_like<decltype(self)>(std::declval<T>()));
         return static_cast<CastType>(self);
     }
@@ -18,9 +20,9 @@ struct wrap_element {
     T value;
 
     template <typename... Types>  // fix for narrowing
-    wrap_element(Types&&... args) : value(std::forward<Types>(args)...) {}
+    constexpr wrap_element(Types&&... args) : value(std::forward<Types>(args)...) {}
 
-    decltype(auto) elem(this auto&& self) {
+    constexpr decltype(auto) elem(this auto&& self) {
         return std::forward_like<decltype(self)>(self.value);
     }
 };
@@ -35,24 +37,28 @@ class base;
 template <size_t... Index, typename... Types>
 class base<std::index_sequence<Index...>, Types...> : public wrap<Index, Types>... {
 public:
-    template <typename... Ua>
-    constexpr base(Ua&&... args) : wrap<Index, Types>(std::forward<Ua>(args))... {}
+    template <typename... UTypes>
+    constexpr base(UTypes&&... args)
+        requires(sizeof...(Types) > 0)
+        : wrap<Index, Types>(std::forward<UTypes>(args))... {}
+
+    constexpr base(const Types&... args)
+        requires(sizeof...(Types) > 0)
+        : wrap<Index, Types>(args)... {}
 
     constexpr base() = default;
+    constexpr base(const base& other) = default;
+    constexpr base(base&& other) = default;
 };
+
+template <typename T>
+void test_implicit_default(T);
+
+template <typename T>
+concept implicitly_default_constructible = requires { test_implicit_default<T>({}); };
 
 template <typename... Types>
-class my_tuple : public base<std::make_index_sequence<sizeof...(Types)>, Types...> {
-public:
-    using base = base<std::make_index_sequence<sizeof...(Types)>, Types...>;
-
-    constexpr my_tuple()
-        requires(std::is_default_constructible_v<Types> && ...)
-        : base() {}
-
-    template <typename... Ua>
-    constexpr my_tuple(Ua&&... args) : base(std::forward<Ua>(args)...) {}
-};
+class my_tuple;
 
 template <size_t I, typename T>
 derive_element<I, T> deduce_base_type(const derive_element<I, T>*);
@@ -97,3 +103,83 @@ constexpr decltype(auto) get(MyTuple auto&& t) noexcept {
     auto& ref = static_cast<Type>(t);
     return std::forward_like<decltype(t)>(ref).elem();
 }
+
+template <typename... Types>
+class my_tuple : public base<std::make_index_sequence<sizeof...(Types)>, Types...> {
+private:
+    template <typename SourceTuple, typename... FWDUTypes>
+    static constexpr bool is_valid_conversion() {
+        return (
+            (sizeof...(Types) == sizeof...(FWDUTypes)) &&
+            (std::is_constructible_v<Types, FWDUTypes> && ...) &&
+            ((sizeof...(Types) != 1) || !((std::is_convertible_v<SourceTuple, Types> ||
+                                           std::is_constructible_v<Types, SourceTuple> ||
+                                           std::is_same_v<Types, std::remove_cvref_t<FWDUTypes>>) &&
+                                          ...)) &&
+            !(std::reference_constructs_from_temporary_v<Types, FWDUTypes> || ...));
+    }
+
+    template <typename... UTypes, size_t... Index>
+    constexpr my_tuple(const my_tuple<UTypes...>& other, std::index_sequence<Index...>)
+        : base_type(get<Index>(other)...) {}
+
+    template <typename... UTypes, size_t... Index>
+    constexpr my_tuple(my_tuple<UTypes...>& other, std::index_sequence<Index...>)
+        : base_type(get<Index>(other)...) {}
+
+    template <typename... UTypes, size_t... Index>
+    constexpr my_tuple(my_tuple<UTypes...>&& other, std::index_sequence<Index...>)
+        : base_type(get<Index>(std::move(other))...) {}
+
+    template <typename... UTypes, size_t... Index>
+    constexpr my_tuple(const my_tuple<UTypes...>&& other, std::index_sequence<Index...>)
+        : base_type(get<Index>(std::move(other))...) {}
+
+public:
+    using base_type = base<std::make_index_sequence<sizeof...(Types)>, Types...>;
+
+    constexpr my_tuple()
+        requires(sizeof...(Types) == 0)
+    = default;
+
+    explicit(!(implicitly_default_constructible<Types> && ...)) constexpr my_tuple()
+        requires(sizeof...(Types) > 0 && (std::is_default_constructible_v<Types> && ...))
+        : base_type() {}
+
+    explicit(!(std::is_convertible_v<const Types&, Types> &&
+               ...)) constexpr my_tuple(const Types&... args)
+        requires(sizeof...(Types) >= 1 && (std::is_copy_constructible_v<Types> && ...))
+        : base_type(args...) {}
+
+    template <typename... UTypes>
+    explicit(!(std::is_convertible_v<UTypes, Types> && ...)) constexpr my_tuple(UTypes&&... args)
+        requires((sizeof...(Types) == sizeof...(UTypes)) && (sizeof...(Types) >= 1) &&
+                 (std::is_constructible_v<Types, UTypes> && ...) &&
+                 !(sizeof...(Types) == 1 && (MyTuple<UTypes> && ...)) &&
+                 !(std::reference_constructs_from_temporary_v<Types, UTypes> || ...))
+        : base_type(std::forward<UTypes>(args)...) {}
+
+    template <typename... UTypes>
+    explicit(!(std::is_convertible_v<const UTypes&, Types> &&
+               ...)) constexpr my_tuple(const my_tuple<UTypes...>& other)
+        requires(is_valid_conversion<const my_tuple<UTypes...>&, const UTypes&...>())
+        : my_tuple(other, std::make_index_sequence<sizeof...(Types)>{}) {}
+
+    template <typename... UTypes>
+    explicit(!(std::is_convertible_v<UTypes&, Types> &&
+               ...)) constexpr my_tuple(my_tuple<UTypes...>& other)
+        requires(is_valid_conversion<my_tuple<UTypes...>&, UTypes&...>())
+        : my_tuple(other, std::make_index_sequence<sizeof...(Types)>{}) {}
+
+    template <typename... UTypes>
+    explicit(!(std::is_convertible_v<UTypes&&, Types> &&
+               ...)) constexpr my_tuple(my_tuple<UTypes...>&& other)
+        requires(is_valid_conversion<my_tuple<UTypes...> &&, UTypes && ...>())
+        : my_tuple(std::move(other), std::make_index_sequence<sizeof...(Types)>{}) {}
+
+    template <typename... UTypes>
+    explicit(!(std::is_convertible_v<const UTypes&&, Types> &&
+               ...)) constexpr my_tuple(const my_tuple<UTypes...>&& other)
+        requires(is_valid_conversion<const my_tuple<UTypes...> &&, const UTypes && ...>())
+        : my_tuple(std::move(other), std::make_index_sequence<sizeof...(Types)>{}) {}
+};
