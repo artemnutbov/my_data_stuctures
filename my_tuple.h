@@ -24,7 +24,12 @@ struct wrap_element {
     constexpr wrap_element(Types&&... args) : value(std::forward<Types>(args)...) {}
 
     constexpr decltype(auto) elem(this auto&& self) {
-        return std::forward_like<decltype(self)>(self.value);
+        using ConstT = std::conditional_t<std::is_const_v<std::remove_reference_t<decltype(self)>>,
+                                          const T, T>;
+        using CastType =
+            std::conditional_t<std::is_lvalue_reference_v<decltype(self)>, ConstT&, ConstT&&>;
+
+        return static_cast<CastType>(self.value);
     }
 };
 
@@ -85,6 +90,32 @@ constexpr bool is_my_tuple_v = is_my_tuple<T>::value;
 template <typename T>
 concept MyTuple = is_my_tuple_v<std::remove_cvref_t<T>>;
 
+template <typename T>
+struct my_tuple_size;
+
+template <typename... Types>
+struct my_tuple_size<my_tuple<Types...>> : std::integral_constant<size_t, sizeof...(Types)> {};
+
+template <typename T>
+constexpr size_t my_tuple_size_v = my_tuple_size<std::remove_cvref_t<T>>::value;
+
+template <size_t I, typename T>
+struct my_tuple_element;
+
+template <size_t I, typename... Types>
+struct my_tuple_element<I, my_tuple<Types...>> {
+    using WrapperType = decltype(deduce_base_type<I>(std::declval<my_tuple<Types...>*>()));
+    using type = typename WrapperType::element_type;
+};
+
+template <size_t I, typename T>
+struct my_tuple_element<I, const T> {
+    using type = const typename my_tuple_element<I, T>::type;
+};
+
+template <size_t I, typename T>
+using my_tuple_element_t = typename my_tuple_element<I, T>::type;
+
 template <size_t I>
 constexpr decltype(auto) get(MyTuple auto&& t) noexcept {
     using BaseType = decltype(deduce_base_type<I>(&t));
@@ -111,8 +142,69 @@ constexpr my_tuple<Types&...> tie(Types&... args) noexcept {
 }
 
 template <typename... Types>
-constexpr my_tuple<Types&&...> forward_as_tuple(Types&&... args) noexcept {
+constexpr my_tuple<Types&&...> forward_as_my_tuple(Types&&... args) noexcept {
     return my_tuple<Types&&...>(std::forward<Types>(args)...);
+}
+
+template <typename... Types>
+constexpr my_tuple<std::unwrap_ref_decay_t<Types>...> make_my_tuple(Types&&... args) {
+    return my_tuple<std::unwrap_ref_decay_t<Types>...>(std::forward<Types>(args)...);
+}
+
+template <size_t I, typename IndexSeq>
+struct repeat_index;
+
+template <size_t I, size_t... Js>
+struct repeat_index<I, std::index_sequence<Js...>> {
+    using type = std::index_sequence<((void)Js, I)...>;
+};
+
+template <size_t I, typename IndexSeq>
+using repeat_index_t = repeat_index<I, IndexSeq>::type;
+
+template <typename... Seqs>
+struct concat_seq;
+
+template <>
+struct concat_seq<> {
+    using type = std::index_sequence<>;
+};
+
+template <size_t... A>
+struct concat_seq<std::index_sequence<A...>> {
+    using type = std::index_sequence<A...>;
+};
+
+template <size_t... A, size_t... B, typename... Rest>
+struct concat_seq<std::index_sequence<A...>, std::index_sequence<B...>, Rest...> {
+    using type = typename concat_seq<std::index_sequence<A..., B...>, Rest...>::type;
+};
+
+template <typename... Seqs>
+using concat_seq_t = typename concat_seq<Seqs...>::type;
+
+template <size_t... I, size_t... J, typename Tuple>
+constexpr auto my_tuple_cat_impl_2(std::index_sequence<I...>, std::index_sequence<J...>,
+                                   Tuple&& all_tuples) {
+    return my_tuple<my_tuple_element_t<
+        J, std::remove_reference_t<decltype(get<I>(std::forward<Tuple>(all_tuples)))>>...>(
+        get<J>(get<I>(std::forward<Tuple>(all_tuples)))...);
+}
+
+template <size_t... Indices, typename... Tuples>
+constexpr auto my_tuple_cat_impl_1(std::index_sequence<Indices...>, Tuples&&... args) {
+    auto all_tuples = forward_as_my_tuple(std::forward<Tuples>(args)...);
+    return my_tuple_cat_impl_2(
+        concat_seq_t<
+            repeat_index_t<Indices, std::make_index_sequence<my_tuple_size_v<Tuples>>>...>{},
+        concat_seq_t<std::make_index_sequence<my_tuple_size_v<Tuples>>...>{},
+        std::move(all_tuples));
+}
+
+template <typename... Tuples>
+constexpr auto my_tuple_cat(Tuples&&... args) {
+    return my_tuple_cat_impl_1(std::make_index_sequence<sizeof...(Tuples)>{},
+                               std::forward<Tuples>(args)...);
 }
 
 template <typename... Types>
@@ -166,7 +258,8 @@ public:
     explicit(!(std::is_convertible_v<UTypes, Types> && ...)) constexpr my_tuple(UTypes&&... args)
         requires((sizeof...(Types) == sizeof...(UTypes)) && (sizeof...(Types) >= 1) &&
                  (std::is_constructible_v<Types, UTypes> && ...) &&
-                 !(sizeof...(Types) == 1 && (MyTuple<UTypes> && ...)) &&
+                 !(sizeof...(Types) == 1 &&
+                   (std::is_same_v<std::remove_cvref_t<UTypes>, my_tuple> && ...)) &&
                  !(std::reference_constructs_from_temporary_v<Types, UTypes &&> || ...))
         : base_type(std::forward<UTypes>(args)...) {}
 
