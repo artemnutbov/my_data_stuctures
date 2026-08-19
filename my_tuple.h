@@ -245,6 +245,14 @@ public:
         requires(sizeof...(Types) == 0)
     = default;
 
+    constexpr my_tuple(const my_tuple& other)
+        requires(std::is_copy_constructible_v<Types> && ...)
+    = default;
+
+    constexpr my_tuple(my_tuple&& other)
+        requires(std::is_move_constructible_v<Types> && ...)
+    = default;
+
     explicit(!(implicitly_default_constructible<Types> && ...)) constexpr my_tuple()
         requires(sizeof...(Types) > 0 && (std::is_default_constructible_v<Types> && ...))
         : base_type() {}
@@ -286,4 +294,23 @@ public:
                ...)) constexpr my_tuple(const my_tuple<UTypes...>&& other)
         requires(is_valid_conversion<const my_tuple<UTypes...> &&, const UTypes && ...>())
         : my_tuple(std::move(other), std::make_index_sequence<sizeof...(Types)>{}) {}
+
+    constexpr my_tuple& operator=(const my_tuple& other)
+        requires(std::is_copy_assignable_v<Types> && ...)
+    = default;
+    constexpr my_tuple& operator=(my_tuple&& other)
+        requires(std::is_move_assignable_v<Types> && ...)
+    = default;
+
+    template <typename... UTypes>
+    constexpr my_tuple& operator=(const my_tuple<UTypes...>& other)
+        requires(sizeof...(Types) == sizeof...(UTypes) &&
+                 (std::is_assignable_v<Types&, const UTypes&> && ...))
+    {
+        [&]<size_t... I>(std::index_sequence<I...>) {
+            ((get<I>(*this) = get<I>(other)), ...);
+        }(std::make_index_sequence<sizeof...(Types)>{});
+
+        return *this;
+    }
 };
